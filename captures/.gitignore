@@ -1,0 +1,5 @@
+alert_config.json
+__pycache__/
+captures/
+intruders/
+*.pyc
