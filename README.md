@@ -139,7 +139,16 @@ SentinelVision/
 └── README.md                # This file
 ```
 
-## 📄 License
+## 👨‍💻 Author
 
-This project is for educational and demonstration purposes.
+**Jitesh Dewangan**  
+Cybersecurity Enthusiast | MCA Student  
+---
+
+## ⚠ Disclaimer
+
+This project is developed for educational and authorized security testing purposes only. Unauthorized scanning or testing of systems without permission is strictly prohibited. 
+
+**All rights reserved. This project is proprietary and cannot be used or modified without explicit permission.**
+
 
