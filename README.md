@@ -14,7 +14,7 @@ Current software features:
 - Add authorized faces from the app with basic details
 - Authorized captures saved in `captures/authorized/`
 - Unauthorized captures saved in `captures/unauthorized/`
-- Unauthorized person photo is sent automatically to admin email when SMTP is configured
+- Unauthorized person photo is sent automatically to admin email when SMTP is configured.
 - Backend alert settings are saved in `alert_config.json`
 
 Admin recipient is fixed to `example@gmail.com`; admin phone is stored as
