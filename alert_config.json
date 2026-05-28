@@ -1,0 +1,10 @@
+{
+  "enabled": true,
+  "smtp_server": "smtp.gmail.com",
+  "smtp_port": 587,
+  "smtp_user": "antivenom8080@gmail.com",
+  "smtp_password": "atrk uzhv rcxs wrpy",
+  "sender_email": "antivenom8080@gmail.com",
+  "admin_email": "antivenom8080@gmail.com",
+  "admin_phone": "6266661940"
+}

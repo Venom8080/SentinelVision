@@ -1,0 +1,10 @@
+{
+  "enabled": true,
+  "smtp_server": "smtp.gmail.com",
+  "smtp_port": 587,
+  "smtp_user": "sender_email@gmail.com",
+  "smtp_password": "sender_gmail_app_password",
+  "sender_email": "sender_email@gmail.com",
+  "admin_email": "antivenom8080@gmail.com",
+  "admin_phone": "6266661940"
+}

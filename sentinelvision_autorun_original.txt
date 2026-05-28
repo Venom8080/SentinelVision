@@ -1,0 +1,490 @@
+"""
+SENTINELVISION_autorun.py
+SentinelVision Defense System (Tkinter UI) — Final with animated welcome + sound
+
+Behavior:
+- Authorized face detected -> camera stops, big animated welcome message shown, success sound plays
+- Unauthorized face -> camera continues, laser/servo commands are sent and UI updates
+"""
+
+import os
+import time
+import pickle
+import threading
+import queue
+import cv2
+import face_recognition
+import numpy as np
+import serial
+from serial.tools import list_ports
+from PIL import Image, ImageTk, ImageDraw, ImageFont
+import tkinter as tk
+from tkinter import ttk, messagebox
+
+# optional sound playback
+try:
+    from playsound import playsound
+    PLAYSOUND_AVAILABLE = True
+except Exception:
+    PLAYSOUND_AVAILABLE = False
+
+# ---------------- CONFIG ----------------
+BAUD = 115200
+ENCODINGS_FILE = "encodings.pkl"
+KNOWN_DIR = "known_faces"
+TOLERANCE = 0.48
+LASER_OFF_DELAY = 2.0
+SERIAL_AUTODETECT = True
+FRAME_WIDTH = 640
+FRAME_HEIGHT = 480
+SMOOTHING = 0.35
+CAM_INDEX = 0
+CAP_BUFFERSIZE = 1
+SOUND_FILE = "success.mp3"   # put a short success mp3 here (or change name)
+WELCOME_MSG_TEMPLATE = "Welcome, {name}! Access Granted."
+ANIM_STEPS = 10              # number of animation frames for scaling text
+ANIM_DELAY = 60              # ms between anim frames
+# ----------------------------------------
+
+def find_serial_port():
+    ports = list(list_ports.comports())
+    if not ports:
+        return None
+    for p in ports:
+        print("[PORT]", p.device, "-", p.description)
+    for p in ports:
+        name = p.device
+        desc = (p.description or "").lower()
+        if 'arduino' in desc or 'ch340' in desc or 'usb serial' in desc or 'ttyusb' in name.lower() or 'acm' in name.lower():
+            print("[INFO] Auto-selected port:", name)
+            return name
+    return ports[0].device
+
+def build_encodings(known_dir=KNOWN_DIR, enc_file=ENCODINGS_FILE):
+    print("[INFO] Preparing face encodings from folder:", known_dir)
+    encs = []
+    names = []
+    if not os.path.isdir(known_dir):
+        raise FileNotFoundError(f"Known faces folder not found: {known_dir}")
+    for person in os.listdir(known_dir):
+        pdir = os.path.join(known_dir, person)
+        if not os.path.isdir(pdir):
+            continue
+        for fname in os.listdir(pdir):
+            path = os.path.join(pdir, fname)
+            try:
+                img = face_recognition.load_image_file(path)
+                boxes = face_recognition.face_locations(img, model='hog')
+                if len(boxes) == 0:
+                    print("  [WARN] No face found in", path)
+                    continue
+                enc = face_recognition.face_encodings(img, boxes)[0]
+                encs.append(enc)
+                names.append(person)
+                print("  [OK] encoded:", person, fname)
+            except Exception as e:
+                print("  [ERR] reading", path, e)
+    with open(enc_file, 'wb') as f:
+        pickle.dump({'encodings': encs, 'names': names}, f)
+    print("[INFO] Encodings saved to", enc_file)
+    return encs, names
+
+def load_encodings(enc_file=ENCODINGS_FILE):
+    if not os.path.exists(enc_file):
+        return None, None
+    with open(enc_file, 'rb') as f:
+        data = pickle.load(f)
+    return data.get('encodings', []), data.get('names', [])
+
+def open_serial(port, baud=BAUD):
+    try:
+        ser = serial.Serial(port, baud, timeout=0.5)
+        time.sleep(2)
+        print("[INFO] Serial opened on", port)
+        return ser
+    except Exception as e:
+        print("[WARN] Could not open serial:", e)
+        return None
+
+def send_cmd(ser, cmd):
+    if ser and getattr(ser, "is_open", False):
+        try:
+            ser.write((cmd + '\n').encode())
+        except Exception as e:
+            print("[WARN] Serial write failed:", e)
+
+def map_center_to_servo(cx, cy):
+    pan = int(np.interp(cx, [0, FRAME_WIDTH], [0, 180]))
+    tilt = int(np.interp(cy, [0, FRAME_HEIGHT], [180, 0]))
+    return pan, tilt
+
+def smooth_angle(prev, target, alpha=SMOOTHING):
+    return int(prev * (1 - alpha) + target * alpha)
+
+# ---------- Camera + Detection Thread ----------
+class CameraWorker(threading.Thread):
+    def __init__(self, frame_queue, encodings, names, ser):
+        super().__init__(daemon=True)
+        self.frame_queue = frame_queue
+        self.encodings = encodings
+        self.names = names
+        self.ser = ser
+        self.stop_event = threading.Event()
+        self.cap = None
+        self.prev_pan = 90
+        self.prev_tilt = 90
+        self.last_face_time = 0
+        self.last_laser_state = False
+
+    def start_capture(self):
+        self.cap = cv2.VideoCapture(CAM_INDEX, cv2.CAP_DSHOW if os.name == 'nt' else 0)
+        try:
+            self.cap.set(cv2.CAP_PROP_BUFFERSIZE, CAP_BUFFERSIZE)
+        except Exception:
+            pass
+        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
+        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
+        time.sleep(0.5)
+
+    def run(self):
+        try:
+            self.start_capture()
+            while not self.stop_event.is_set():
+                ret, frame = self.cap.read()
+                if not ret or frame is None:
+                    time.sleep(0.02)
+                    continue
+
+                small = cv2.resize(frame, (0,0), fx=0.5, fy=0.5)
+                rgb_small = cv2.cvtColor(small, cv2.COLOR_BGR2RGB)
+
+                boxes = face_recognition.face_locations(rgb_small, model='hog')
+                encs_frame = face_recognition.face_encodings(rgb_small, boxes)
+
+                faces_detected = False
+                authorized_detected = False
+                unauthorized_detected = False
+                detected_name = None
+
+                scale = 2
+                for i, face_enc in enumerate(encs_frame):
+                    top, right, bottom, left = boxes[i]
+                    top *= scale; right *= scale; bottom *= scale; left *= scale
+                    faces_detected = True
+
+                    dists = face_recognition.face_distance(self.encodings, face_enc) if len(self.encodings) > 0 else []
+                    name = "Unknown"
+                    if len(dists) > 0:
+                        idx = np.argmin(dists)
+                        if dists[idx] <= TOLERANCE:
+                            name = self.names[idx]
+
+                    color = (0,255,0) if name != "Unknown" else (0,0,255)
+                    cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
+                    cv2.putText(frame, name, (left, top-10), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255,255,255), 2)
+
+                    if name != "Unknown":
+                        authorized_detected = True
+                        detected_name = name
+                        if self.last_laser_state:
+                            send_cmd(self.ser, "D")
+                            self.last_laser_state = False
+                    else:
+                        unauthorized_detected = True
+                        cx = left + (right-left)/2
+                        cy = top + (bottom-top)/2
+                        pan, tilt = map_center_to_servo(cx, cy)
+                        pan = smooth_angle(self.prev_pan, pan)
+                        tilt = smooth_angle(self.prev_tilt, tilt)
+                        self.prev_pan, self.prev_tilt = pan, tilt
+                        send_cmd(self.ser, f'P{pan},{tilt}')
+                        send_cmd(self.ser, "L")
+                        self.last_laser_state = True
+                        self.last_face_time = time.time()
+
+                # Laser off if no faces
+                if not faces_detected and self.last_laser_state and (time.time() - self.last_face_time) > LASER_OFF_DELAY:
+                    send_cmd(self.ser, "D")
+                    self.last_laser_state = False
+
+                status = {
+                    'frame': frame,
+                    'faces_detected': faces_detected,
+                    'authorized': authorized_detected,
+                    'unauthorized': unauthorized_detected,
+                    'name': detected_name,
+                    'laser': self.last_laser_state,
+                    'time': time.time()
+                }
+
+                try:
+                    if self.frame_queue.qsize() > 1:
+                        _ = self.frame_queue.get_nowait()
+                    self.frame_queue.put_nowait(status)
+                except queue.Full:
+                    pass
+
+                time.sleep(0.01)
+        except Exception as e:
+            print("[ERROR] CameraWorker:", e)
+        finally:
+            try:
+                if self.cap is not None:
+                    self.cap.release()
+            except:
+                pass
+
+    def stop(self):
+        self.stop_event.set()
+
+# ---------- UI with animation & sound ----------
+class SentinelVisionUI:
+    def __init__(self, root, encodings, names, ser):
+        self.root = root
+        self.root.title("SentinelVision Defense System")
+        self.encodings = encodings
+        self.names = names
+        self.ser = ser
+        self.auth_handled = False
+
+        # layout
+        self.video_frame = ttk.Frame(root)
+        self.video_frame.grid(row=0, column=0, padx=6, pady=6)
+        self.panel_frame = ttk.Frame(root, width=300)
+        self.panel_frame.grid(row=0, column=1, sticky='ns', padx=6, pady=6)
+
+        # video label
+        self.video_label = tk.Label(self.video_frame)
+        self.video_label.pack()
+
+        # status widgets
+        self.status_label = tk.Label(self.panel_frame, text="Status: Idle", font=('Helvetica', 14, 'bold'))
+        self.status_label.pack(pady=(6,4))
+        self.name_label = tk.Label(self.panel_frame, text="Name: -", font=('Helvetica', 12))
+        self.name_label.pack(pady=4)
+        self.laser_label = tk.Label(self.panel_frame, text="Laser: OFF", font=('Helvetica', 12))
+        self.laser_label.pack(pady=4)
+        self.time_label = tk.Label(self.panel_frame, text="Last: -", font=('Helvetica', 10))
+        self.time_label.pack(pady=4)
+        ttk.Separator(self.panel_frame, orient='horizontal').pack(fill='x', pady=8)
+
+        # buttons
+        self.quarantine_btn = ttk.Button(self.panel_frame, text="Quarantine (demo)", command=self.quarantine_action)
+        self.quarantine_btn.pack(fill='x', padx=10, pady=6)
+        self.stop_btn = ttk.Button(self.panel_frame, text="Stop", command=self.stop_app)
+        self.stop_btn.pack(fill='x', padx=10, pady=6)
+
+        # worker
+        self.frame_queue = queue.Queue(maxsize=2)
+        self.cam_worker = CameraWorker(self.frame_queue, self.encodings, self.names, self.ser)
+        self.cam_worker.start()
+
+        # update UI
+        self.update_ui()
+
+    def quarantine_action(self):
+        if self.ser:
+            send_cmd(self.ser, "D")
+        messagebox.showinfo("Quarantine", "Demo quarantine executed (non-destructive).")
+
+    def stop_app(self):
+        if messagebox.askyesno("Exit", "Stop SentinelVision and exit?"):
+            try:
+                self.cam_worker.stop()
+            except:
+                pass
+            self.root.after(200, self.root.destroy)
+
+    def play_sound_thread(self):
+        # Play the success sound in a thread (non-blocking)
+        def _play():
+            try:
+                if PLAYSOUND_AVAILABLE and os.path.exists(SOUND_FILE):
+                    playsound(SOUND_FILE)
+                else:
+                    # fallback: platform beep
+                    if os.name == 'nt':
+                        import winsound
+                        winsound.Beep(1000, 300)
+                    else:
+                        # try aplay or printf bell
+                        try:
+                            os.system('aplay ' + SOUND_FILE + ' >/dev/null 2>&1 &')
+                        except:
+                            print('\a', end='', flush=True)
+            except Exception as e:
+                print("[WARN] sound play failed:", e)
+        t = threading.Thread(target=_play, daemon=True)
+        t.start()
+
+    def animate_welcome(self, name):
+        # Create animated frames with increasing font size (PIL)
+        text = WELCOME_MSG_TEMPLATE.format(name=name or "Guest")
+        w, h = FRAME_WIDTH, FRAME_HEIGHT
+        frames = []
+        base_font_size = int(min(w, h) * 0.06)  # starting font size
+        # create gradient of sizes
+        for step in range(ANIM_STEPS):
+            size = base_font_size + int((step / (ANIM_STEPS - 1)) * base_font_size * 1.8)
+            img = Image.new('RGB', (w, h), color=(40, 200, 40))
+            draw = ImageDraw.Draw(img)
+            try:
+                font = ImageFont.truetype("arial.ttf", size)
+            except Exception:
+                font = ImageFont.load_default()
+            tw, th = draw.textsize(text, font=font)
+            draw.text(((w - tw) // 2, (h - th) // 2), text, fill=(0, 0, 0), font=font)
+            frames.append(img)
+        # play animation on UI (non-blocking)
+        def _animate():
+            for img in frames:
+                try:
+                    imgtk = ImageTk.PhotoImage(img)
+                    self.video_label.imgtk = imgtk
+                    self.video_label.configure(image=imgtk)
+                except Exception:
+                    pass
+                time.sleep(ANIM_DELAY / 1000.0)
+            # keep final frame displayed (already last)
+        t = threading.Thread(target=_animate, daemon=True)
+        t.start()
+
+    def handle_authorized_event(self, name):
+        # one-time handling
+        if self.auth_handled:
+            return
+        self.auth_handled = True
+
+        # stop camera worker
+        try:
+            self.cam_worker.stop()
+        except:
+            pass
+
+        # ensure laser off
+        if self.ser and getattr(self.ser, "is_open", False):
+            send_cmd(self.ser, "D")
+
+        # update side panel quickly
+        welcome_text = WELCOME_MSG_TEMPLATE.format(name=name or "Guest")
+        self.status_label.config(text=welcome_text, fg='green')
+        self.name_label.config(text=f"Authorized: {name}")
+        self.laser_label.config(text="Laser: OFF")
+        self.time_label.config(text="Last: " + time.strftime("%H:%M:%S", time.localtime()))
+
+        # play sound and animate big text
+        self.play_sound_thread()
+        self.animate_welcome(name)
+
+        # disable buttons
+        try:
+            self.quarantine_btn.state(['disabled'])
+        except:
+            pass
+
+    def update_ui(self):
+        # get latest status
+        try:
+            status = self.frame_queue.get_nowait()
+        except queue.Empty:
+            status = None
+
+        if status:
+            # if authorized already handled, don't overwrite welcome
+            if self.auth_handled:
+                self.root.after(200, self.update_ui)
+                return
+
+            frame = status['frame']
+            faces = status['faces_detected']
+            auth = status['authorized']
+            unauth = status['unauthorized']
+            name = status['name']
+            laser = status['laser']
+            ts = status['time']
+
+            # Trigger authorized event (one-time)
+            if auth and not self.auth_handled:
+                self.handle_authorized_event(name)
+                self.root.after(200, self.update_ui)
+                return
+
+            # update panel
+            if auth:
+                self.status_label.config(text="Status: AUTHORIZED", fg='green')
+                self.name_label.config(text=f"Name: {name}")
+            elif unauth:
+                self.status_label.config(text="Status: UNAUTHORIZED", fg='red')
+                self.name_label.config(text="Name: Unknown")
+            else:
+                self.status_label.config(text="Status: No face", fg='black')
+                self.name_label.config(text="Name: -")
+
+            self.laser_label.config(text=f"Laser: {'ON' if laser else 'OFF'}")
+            self.time_label.config(text="Last: " + time.strftime("%H:%M:%S", time.localtime(ts)))
+
+            # convert frame to ImageTk and show
+            try:
+                img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                img = Image.fromarray(img)
+                img = img.resize((FRAME_WIDTH, FRAME_HEIGHT))
+                imgtk = ImageTk.PhotoImage(image=img)
+                self.video_label.imgtk = imgtk
+                self.video_label.configure(image=imgtk)
+            except Exception as e:
+                print("[WARN] UI image update failed:", e)
+
+        self.root.after(30, self.update_ui)
+
+# ---------- Main ----------
+def main():
+    encodings, names = load_encodings()
+    if not encodings:
+        try:
+            encodings, names = build_encodings()
+        except Exception as e:
+            print("[ERROR] Could not build encodings:", e)
+            return
+
+    if not encodings:
+        print("[ERROR] No encodings found. Place images in known_faces/ and restart.")
+        return
+
+    ser = None
+    serial_port = None
+    if SERIAL_AUTODETECT:
+        try:
+            serial_port = find_serial_port()
+        except Exception:
+            serial_port = None
+
+    if not serial_port:
+        resp = input("Enter serial port (e.g., COM3 or /dev/ttyACM0) or leave empty to run without Arduino: ").strip()
+        serial_port = resp or None
+
+    if serial_port:
+        ser = open_serial(serial_port)
+        if ser is None:
+            print("[WARN] Running without Arduino connection.")
+
+    root = tk.Tk()
+    app = SentinelVisionUI(root, encodings, names, ser)
+    try:
+        root.mainloop()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        try:
+            app.cam_worker.stop()
+        except:
+            pass
+        try:
+            if ser and getattr(ser, "is_open", False):
+                send_cmd(ser, "D")
+                ser.close()
+        except:
+            pass
+        print("[INFO] Application exited.")
+
+if __name__ == "__main__":
+    main()
