@@ -10,7 +10,7 @@ Current software features:
 
 - Live CCTV/webcam monitoring with face recognition
 - Green welcome UI for authorized people with name
-- Red warning UI for unauthorized people
+- Red warning UI for unauthorized people.
 - Add authorized faces from the app with basic details
 - Authorized captures saved in `captures/authorized/`
 - Unauthorized captures saved in `captures/unauthorized/`
