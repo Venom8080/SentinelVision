@@ -22,29 +22,14 @@ Admin recipient is fixed to `example@gmail.com`; admin phone is stored as
 variables. The UI does not show a separate alert settings tab.
 
 ---
-
-An AI-based security system that uses real-time face detection and recognition to identify authorized and unauthorized persons. The system tracks unauthorized faces using servo motors and aims a laser pointer at them.
+security system that uses real-time face detection and recognition to identify authorized and unauthorized persons. The system tracks unauthorized faces using servo motors and aims a laser pointer at them.
 
 ## 🎯 Main Features
 
 - **Real-time Face Detection**: Uses laptop webcam for live video feed
 - **Face Recognition**: Identifies authorized persons from a database
 - **Authorized Face Response**: Shows welcome message with person's name
-- **Unauthorized Face Response**: 
-  - Tracks face using Pan-Tilt servo motors
-  - Aims laser pointer at the face
   - Displays warning message on UI
-
-## 🧩 Hardware Requirements
-
-| Component | Purpose |
-|-----------|---------|
-| Laptop/PC | AI Processing (Python + OpenCV) |
-| Webcam (laptop builtin) | Live face feed |
-| Arduino Uno / Nano | Servo + Laser control |
-| 2x Servo Motors (Pan + Tilt) | Face tracking mechanism |
-| Laser Module | Unauthorized face warning pointer |
-| Jumper wires, mount, 5V supply | Mechanical setup |
 
 ## 📦 Software Requirements
 
@@ -60,21 +45,6 @@ An AI-based security system that uses real-time face detection and recognition t
 pip install -r requirements.txt
 ```
 
-### 2. Setup Arduino
-
-1. Connect Arduino to your computer via USB
-2. Open `arduino_firmware.ino` in Arduino IDE
-3. Select your Arduino board and COM port
-4. Upload the firmware to Arduino
-
-### 3. Hardware Connections
-
-Connect components to Arduino:
-
-- **Pan Servo**: Pin 9
-- **Tilt Servo**: Pin 10
-- **Laser Module**: Pin 11
-- **Power**: 5V and GND (use external power supply for servos if needed)
 
 ### 4. Add Authorized Faces
 
@@ -112,8 +82,6 @@ python sentinelvision.py
 
 - **Live Camera Preview**: Shows real-time video feed with face detection boxes
 - **Status Display**: Shows current system status (Authorized/Unauthorized/Waiting)
-- **Arduino Connection Status**: Indicates if Arduino is connected
-- **Laser Indicator**: Shows laser ON/OFF status
 - **System Log**: Displays all system events and messages
 
 ### Arduino Commands
@@ -124,16 +92,7 @@ The Python application sends these commands to Arduino:
 |---------|-------------|
 | `AUTH <name>` | Authorized face detected, turn off laser |
 | `UNAUTH <pan> <tilt>` | Unauthorized face, move servos to specified angles |
-| `LASER_ON` | Turn laser on |
-| `LASER_OFF` | Turn laser off |
 
-## 🧮 Servo Tracking Logic
-
-The system calculates face position in the frame and converts it to servo angles:
-
-```
-pan_angle  = map(face_center_x, 0 → frame_width, 0 → 180)
-tilt_angle = map(face_center_y, 0 → frame_height, 0 → 180)
 ```
 
 ## 🧪 Testing Scenarios
@@ -147,7 +106,7 @@ tilt_angle = map(face_center_y, 0 → frame_height, 0 → 180)
 
 ## 📌 Project Summary
 
-**SentinelVision Defense System** is an AI-based security project where a laptop webcam performs real-time face detection. For authorized faces, the UI displays a welcome message. For unauthorized faces, the system tracks the face using servo motors and aims a laser pointer at it, while displaying a warning message on the UI.
+**SentinelVision Defense System** is an security project where a laptop webcam performs real-time face detection. For authorized faces, the UI displays a welcome message. For unauthorized faces, the system tracks the face using servo motors and aims a laser pointer at it, while displaying a warning message on the UI.
 
 ## 🔧 Troubleshooting
 
@@ -155,21 +114,10 @@ tilt_angle = map(face_center_y, 0 → frame_height, 0 → 180)
 - Check if webcam is accessible by other applications
 - Try changing `CAM_INDEX` in `sentinelvision.py` (0, 1, 2, etc.)
 
-### Arduino Not Connecting
-- Check USB connection
-- Verify COM port in Device Manager
-- Click "Scan for Arduino" button in the UI
-- Ensure Arduino firmware is uploaded correctly
-
 ### Face Recognition Not Working
 - Ensure `encodings.pickle` file exists
 - Add more images of authorized persons to improve accuracy
 - Check image quality in `known_faces/` directory
-
-### Servo Not Moving
-- Check wiring connections
-- Verify servo power supply (may need external 5V supply)
-- Test servos individually using Arduino IDE Serial Monitor
 
 ## 📝 Notes
 
@@ -186,10 +134,8 @@ tilt_angle = map(face_center_y, 0 → frame_height, 0 → 180)
 SentinelVision/
 ├── sentinelvision.py          # Main application
 ├── SENTINELVISION_helpers.py       # Helper functions (SerialController, etc.)
-├── arduino_firmware.ino      # Arduino code
 ├── requirements.txt          # Python dependencies
 ├── encodings.pickle         # Face encodings database
-├── known_faces/             # Authorized face images
 └── README.md                # This file
 ```
 
