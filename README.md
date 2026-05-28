@@ -130,7 +130,7 @@ The Python application sends these commands to Arduino:
 
 ### File Structure
 
-```
+
 SentinelVision/
 ├── sentinelvision.py          # Main application
 ├── SENTINELVISION_helpers.py       # Helper functions (SerialController, etc.)
