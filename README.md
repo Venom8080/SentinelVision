@@ -17,8 +17,8 @@ Current software features:
 - Unauthorized person photo is sent automatically to admin email when SMTP is configured
 - Backend alert settings are saved in `alert_config.json`
 
-Admin recipient is fixed to `antivenom8080@gmail.com`; admin phone is stored as
-`6266661940`. Fill sender SMTP details in `alert_config.json` or via environment
+Admin recipient is fixed to `example@gmail.com`; admin phone is stored as
+`****661***`. Fill sender SMTP details in `alert_config.json` or via environment
 variables. The UI does not show a separate alert settings tab.
 
 ---
