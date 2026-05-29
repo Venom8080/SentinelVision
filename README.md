@@ -1,154 +1,354 @@
-# SentinelVision Software Security System
+# 🛡️ SentinelVision Software Security System
 
-Run the software-only CCTV dashboard:
+## 🚀 Real-Time Face Recognition Security Monitoring System
 
-```bash
-python sentinelvision.py
-```
+SentinelVision is a Computer Vision-based security monitoring system developed using Python, OpenCV, and Tkinter. It performs real-time face detection and face recognition through a webcam to identify authorized and unauthorized individuals.
 
-Current software features:
-
-- Live CCTV/webcam monitoring with face recognition
-- Green welcome UI for authorized people with name
-- Red warning UI for unauthorized people.
-- Add authorized faces from the app with basic details
-- Authorized captures saved in `captures/authorized/`
-- Unauthorized captures saved in `captures/unauthorized/`
-- Unauthorized person photo is sent automatically to admin email when SMTP is configured.
-- Backend alert settings are saved in `alert_config.json`
-
-Admin recipient is fixed to `example@gmail.com`; admin phone is stored as
-`****661***`. Fill sender SMTP details in `alert_config.json` or via environment
-variables. The UI does not show a separate alert settings tab.
+The system automatically stores evidence images, maintains security logs, manages authorized users, and can send email alerts when unknown individuals are detected.
 
 ---
-security system that uses real-time face detection and recognition to identify authorized and unauthorized persons. The system tracks unauthorized faces using servo motors and aims a laser pointer at them.
 
-## 🎯 Main Features
+## ✨ Features
 
-- **Real-time Face Detection**: Uses laptop webcam for live video feed
-- **Face Recognition**: Identifies authorized persons from a database
-- **Authorized Face Response**: Shows welcome message with person's name
-  - Displays warning message on UI
+### 🔍 Real-Time Face Detection
 
-## 📦 Software Requirements
+* Live webcam monitoring
+* Fast face detection using OpenCV
+* Real-time processing and tracking
 
-- Python 3.8 or higher
-- Arduino IDE (for uploading firmware)
-- Required Python libraries (see `requirements.txt`)
+### 👤 Face Recognition
 
-## 🚀 Installation
+* Recognizes registered users
+* Displays person name upon successful recognition
+* Green ACCESS GRANTED notification
 
-### 1. Install Python Dependencies
+### 🚨 Unauthorized Detection
+
+* Detects unknown individuals
+* Displays warning alerts
+* Stores evidence images automatically
+* Generates security logs
+
+### 📧 Email Alerts
+
+* Sends unauthorized person's image to administrator
+* SMTP-based notification system
+* Configurable email settings
+
+### 📁 Evidence Management
+
+* Authorized captures stored separately
+* Unauthorized captures stored separately
+* Automatic timestamp generation
+
+### 📊 Security Logging
+
+* CSV-based event logging
+* Detection history tracking
+* Security audit records
+
+### 🎙 Voice Greeting
+
+* Optional voice welcome message for authorized users
+
+---
+
+## 🏗️ System Workflow
+
+```text
+Webcam
+   │
+   ▼
+Face Detection
+   │
+   ▼
+Face Recognition
+   │
+ ┌─┴─────────────┐
+ │               │
+ ▼               ▼
+Authorized    Unauthorized
+ │               │
+ ▼               ▼
+Green UI      Red Alert
+ │               │
+ ▼               ▼
+Capture Save  Capture Save
+ │               │
+ ▼               ▼
+Event Log     Email Alert
+```
+
+---
+
+## 🛠️ Technology Stack
+
+| Technology | Purpose                      |
+| ---------- | ---------------------------- |
+| Python     | Core Development             |
+| OpenCV     | Face Detection & Recognition |
+| Tkinter    | Desktop GUI                  |
+| NumPy      | Numerical Processing         |
+| Pillow     | Image Processing             |
+| pyttsx3    | Voice Greeting               |
+| SMTP       | Email Notifications          |
+
+---
+
+# 📋 Requirements
+
+* Python 3.8 or Higher
+* Webcam
+* Windows / Linux / macOS
+* Internet Connection (for Email Alerts)
+
+---
+
+# 📥 Installation Guide
+
+## 1. Clone Repository
+
+```bash
+git clone https://github.com/Venom8080/SentinelVision.git
+```
+
+## 2. Open Project Directory
+
+```bash
+cd SentinelVision
+```
+
+## 3. Create Virtual Environment (Recommended)
+
+### Windows
+
+```bash
+python -m venv venv
+venv\Scripts\activate
+```
+
+### Linux / macOS
+
+```bash
+python3 -m venv venv
+source venv/bin/activate
+```
+
+## 4. Install Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
+---
 
-### 4. Add Authorized Faces
-
-1. Place images of authorized persons in the `known_faces/` directory
-   - Supported formats: `.jpg`, `.jpeg`, `.png`, `.bmp`
-   - Use clear, front-facing photos for best results
-   - Name files with the person's name (e.g., `Arjun.jpg`, `John.jpg`)
-
-2. Run the face encoding script to generate encodings:
-
-```bash
-python encode_faces.py
-```
-
-This will create `encodings.pickle` file with face encodings for all authorized persons.
-
-## 🖥 Usage
-
-### Running the Application
+# ▶️ Run The Project
 
 ```bash
 python sentinelvision.py
 ```
 
-### System Flow
+Alternative Entry Point:
 
-1. **Webcam Capture**: System captures real-time video from webcam
-2. **Face Detection**: Detects faces in the video frame
-3. **Face Recognition**: Compares detected faces with authorized database
-4. **Decision Making**:
-   - **Authorized**: Shows welcome message, turns off laser
-   - **Unauthorized**: Tracks face with servos, aims laser, shows warning
-
-### UI Features
-
-- **Live Camera Preview**: Shows real-time video feed with face detection boxes
-- **Status Display**: Shows current system status (Authorized/Unauthorized/Waiting)
-- **System Log**: Displays all system events and messages
-
-### Arduino Commands
-
-The Python application sends these commands to Arduino:
-
-| Command | Description |
-|---------|-------------|
-| `AUTH <name>` | Authorized face detected, turn off laser |
-| `UNAUTH <pan> <tilt>` | Unauthorized face, move servos to specified angles |
-
+```bash
+python sentinelvision_main.py
 ```
 
-## 🧪 Testing Scenarios
-
-| Test Case | Expected Behavior |
-|-----------|-------------------|
-| Authorized known face | UI shows name, no laser, no tracking |
-| New/unknown person | Laser aims at face, tracking active, UI warning |
-| Person moves left/right | Pan-Tilt servos follow the movement |
-| No person in frame | Laser OFF, UI shows "Waiting for face..." |
-
-## 📌 Project Summary
-
-**SentinelVision Defense System** is an security project where a laptop webcam performs real-time face detection. For authorized faces, the UI displays a welcome message. For unauthorized faces, the system tracks the face using servo motors and aims a laser pointer at it, while displaying a warning message on the UI.
-
-## 🔧 Troubleshooting
-
-### Camera Not Working
-- Check if webcam is accessible by other applications
-- Try changing `CAM_INDEX` in `sentinelvision.py` (0, 1, 2, etc.)
-
-### Face Recognition Not Working
-- Ensure `encodings.pickle` file exists
-- Add more images of authorized persons to improve accuracy
-- Check image quality in `known_faces/` directory
-
-## 📝 Notes
-
-- The system processes every 3rd frame for better performance
-- Face recognition tolerance is set to 0.6 (adjustable in code)
-- Servo movement is smoothed to prevent jitter
-- Laser automatically turns off when no face is detected for 2 seconds
-
-## 👨‍💻 Development
-
-### File Structure
-
-
-SentinelVision/
-├── sentinelvision.py          # Main application
-├── SENTINELVISION_helpers.py       # Helper functions (SerialController, etc.)
-├── requirements.txt          # Python dependencies
-├── encodings.pickle         # Face encodings database
-└── README.md                # This file
-```
-
-## 👨‍💻 Author
-
-**Jitesh Dewangan**  
-Cybersecurity Enthusiast | MCA Student  
 ---
 
-## ⚠ Disclaimer
+# 👥 Register Authorized Users
 
-This project is developed for educational and authorized security testing purposes only. Unauthorized scanning or testing of systems without permission is strictly prohibited. 
+## Method 1 (Recommended)
 
-**All rights reserved. This project is proprietary and cannot be used or modified without explicit permission.**
+1. Launch SentinelVision
+2. Open Add Face section
+3. Enter user details
+4. Capture face image
+5. Save
 
+The system automatically:
 
+* Stores face image
+* Updates authorized database
+* Retrains recognizer
+* Logs registration event
+
+---
+
+## Method 2 (Manual)
+
+Place images inside:
+
+```text
+known_faces/
+```
+
+Example:
+
+```text
+known_faces/
+├── Jitesh/
+│   ├── image1.jpg
+│   └── image2.jpg
+```
+
+Use clear front-facing images for better recognition accuracy.
+
+---
+
+# 📧 Email Alert Configuration
+
+Create:
+
+```text
+alert_config.json
+```
+
+Example:
+
+```json
+{
+  "enabled": true,
+  "smtp_server": "smtp.gmail.com",
+  "smtp_port": 587,
+  "smtp_user": "your_email@gmail.com",
+  "smtp_password": "your_app_password",
+  "sender_email": "your_email@gmail.com",
+  "admin_email": "your_admin_email@gmail.com"
+}
+```
+
+### Gmail Users
+
+Use a Gmail App Password instead of your normal Gmail password.
+
+---
+
+# 📂 Project Structure
+
+```text
+SentinelVision/
+│
+├── sentinelvision.py
+├── sentinelvision_main.py
+├── requirements.txt
+├── README.md
+│
+├── known_faces/
+│
+├── captures/
+│   ├── authorized/
+│   └── unauthorized/
+│
+├── screenshots/
+│
+├── authorized_people.json
+├── security_events.csv
+├── alert_config.example.json
+└── alert_config.json
+```
+
+---
+
+# 🧪 Testing Scenarios
+
+| Test Case          | Expected Result      |
+| ------------------ | -------------------- |
+| Authorized User    | Access Granted       |
+| Unauthorized User  | Warning Alert        |
+| No Face Detected   | Waiting State        |
+| Multiple Faces     | Detect All Faces     |
+| Email Notification | Admin Receives Alert |
+
+---
+
+# 🔧 Troubleshooting
+
+## Camera Not Working
+
+* Check webcam permissions
+* Close other camera applications
+* Change camera index
+
+```python
+CAM_INDEX = 1
+```
+
+---
+
+## Face Recognition Not Working
+
+* Install opencv-contrib-python
+* Add multiple face samples
+* Improve lighting conditions
+* Use clear front-facing images
+
+---
+
+## Email Alert Not Working
+
+* Verify SMTP credentials
+* Check internet connection
+* Use Gmail App Password
+* Ensure alert system is enabled
+
+---
+
+# 🎯 Skills Demonstrated
+
+* Python Programming
+* OpenCV
+* Computer Vision
+* Face Recognition
+* Security Monitoring
+* Event Logging
+* Email Automation
+* Tkinter GUI Development
+* Image Processing
+
+---
+
+# 🔮 Future Improvements
+
+* Multi-Camera Monitoring
+* Database Integration
+* Mobile Notifications
+* Cloud Storage
+* User Authentication Dashboard
+* Web-Based Monitoring Panel
+
+---
+
+# 👨‍💻 Author
+
+## Jitesh Dewangan
+
+Cybersecurity Enthusiast | MCA Student | CyberSecurity
+
+### Connect With Me
+
+🔗 LinkedIn
+https://www.linkedin.com/in/jitesh-dewangan-17617424b/
+
+🔗 GitHub
+https://github.com/Venom8080
+
+---
+
+# ⚠️ Disclaimer
+
+This project is developed for educational and research purposes only. Users are responsible for complying with local laws and regulations regarding surveillance, monitoring, and data collection.
+
+---
+
+# ⭐ Support
+
+If you find this project useful:
+⭐ Star the Repository
+🍴 Fork the Repository
+🤝 Contribute Improvements
+📢 Share with Others
+
+---
+
+### Made with ❤️ by Jitesh Dewangan
